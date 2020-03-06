@@ -1,0 +1,525 @@
+---
+title: "Classification Regression"
+author: "Zachary M. Wing"
+date: "2/6/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Lab 4.6
+
+## 4.6.1
+
+```{r, 461}
+require(MASS)
+require(ISLR)
+
+
+
+```
+
+Percentage Returns for S&P 500 index over 1250 Days beginning of 2001 end of 2005
+
+Lag1: Previous Day percent return
+Lag2: -2 Day percent return
+Lag3: -3 Day Percent Return
+Lag4: -4 Day Percent Return
+Lag5: -5 Day Percent Return
+Today: Current Day Percent Return
+Volume: Number of shares traded previous day in billions
+Direction: Categorical "UP" or "DOWN" market on day
+
+
+
+
+```{r, 461x}
+head(Smarket)
+
+
+```
+
+```{r, 4611}
+names(Smarket)
+dim(Smarket)
+summary(Smarket)
+
+
+
+
+```
+
+
+
+```{r, 4612}
+
+cor(Smarket[,-9])
+
+
+
+
+```
+
+```{r,4613}
+
+attach(Smarket)
+plot(Volume)
+
+
+
+```
+
+
+
+## 4.6.2
+
+
+Logistic Regression/Categorical Prediction
+
+
+predicting Direction ("UP" vs "DOWN") using:
+
+Lag 1-5, and Volume
+
+```{r, 462}
+
+glm.fits=glm(Direction~Lag1+Lag2+Lag3+Lag4+Lag5+Volume, data=Smarket, family=binomial)
+summary(glm.fits)
+
+
+
+```
+
+
+
+coeficcients of intercepts and p values
+
+
+```{r, 4621}
+
+coef(glm.fits)
+summary(glm.fits)
+summary(glm.fits)$coef[,4]
+```
+
+
+using the glm fit to predict Direction. This is Dummy Coded where is 1 is UP and 0 is DOWN. Show the first 10 predicted values.
+
+```{r, 4622}
+
+glm.probs=predict(glm.fits,type="response")
+glm.probs[1:10]
+
+contrasts(Direction)
+
+```
+
+
+Predit the entire dataset of 1250 observations where <.5 probablity is "DOWN" and >.5 probabilty is "UP"
+
+table function is used to create confusion matrix for those correctly classified and incorrectly classified.
+
+True UP: 507
+FALSE Positive(DOWN, but predicted as UP): 457
+True DOWN: 145
+FALSE Negative(UP, but predicted as DOWN): 141
+
+Correct: 652/1250
+We correctly predicted 52.16% of the time
+
+Trainning errror rate: 100-52.2=47.8%
+
+
+```{r, 4623}
+
+glm.pred=rep("Down",1250)
+glm.pred[glm.probs>.5]="Up"
+
+
+#View(Direction)
+
+x1 <-as.data.frame(Direction)
+x2 <- subset(x1,x1$Direction=="Down")
+
+
+
+table(glm.pred, Direction)
+
+mean(glm.pred==Direction)
+
+```
+
+
+
+Cross Validation using trainning and test splitting at Year 2005 last year is the test
+
+```{r, 4624}
+
+train=(Year<2005)
+Smarket.2005=Smarket[!train,]
+dim(Smarket.2005)
+Direction.2005=Direction[!train]
+
+```
+
+
+
+```{r, 4625}
+
+glm.fits=glm(Direction~Lag1+Lag2+Lag3+Lag4+Lag5+Volume, data=Smarket, family=binomial, subset=train)
+glm.probs=predict(glm.fits,Smarket.2005,type="response")
+
+
+
+```
+
+
+Test correct prediction = 48.01%
+Test error rate = 51.98%
+```{r, 4626}
+
+glm.pred=rep("Down", 252)
+glm.pred[glm.probs>.5]="Up"
+table(glm.pred,Direction.2005)
+
+mean(glm.pred==Direction.2005)
+mean(glm.pred!=Direction.2005)
+
+
+```
+
+Refit model using just last 2 previous days; best ones significant in predicting Direciton
+
+
+Test success prediciton: 56.35%
+Accuracy prediciton rate: 57.92%
+
+```{r, 4627}
+
+glm.fits=glm(Direction~Lag1+Lag2,data=Smarket, family=binomial, subset=train)
+glm.probs=predict(glm.fits,Smarket.2005,type="response")
+glm.pred[glm.probs>.5]="Up"
+table(glm.pred,Direction.2005)
+
+mean(glm.pred==Direction.2005)
+
+
+106/(107+76)
+
+
+
+```
+
+
+
+
+predicting Direction using exact values for input predictors to recieve predicted Direction. Both days are projected as a "DOWN" but close to even
+
+
+
+
+```{r, 4628}
+
+predict(glm.fits,newdata=data.frame(Lag1=c(1.2,1.5),Lag2=c(1.1,-0.8)),type="response")
+
+
+```
+
+
+
+
+## 4.6.3
+
+Linear Discriminant Analysis
+
+49.20% of training is DOWN
+50.80% of training is UP
+
+Looking at the mean on days that the market is up the previous 2 days are negative returns at a average of those mean values.
+
+
+
+```{r, 463}
+
+lda.fit=lda(Direction~Lag1+Lag2,data=Smarket, subset=train)
+lda.fit
+
+plot(lda.fit)
+
+
+```
+
+
+
+
+```{r, 4631}
+
+
+lda.pred=predict(lda.fit, Smarket.2005)
+names(lda.pred)
+
+
+
+```
+
+
+Test success prediciton: 55.95%
+Not really different from Logistic regression
+
+```{r, 4632}
+lda.class=lda.pred$class
+table(lda.class,Direction.2005)
+mean(lda.class==Direction.2005)
+
+```
+
+
+Predicted Down
+Predicted UP
+
+```{r,4633}
+
+sum(lda.pred$posterior[,1]>=.5)
+
+sum(lda.pred$posterior[,1]<.5)
+
+```
+
+
+
+```{r, 4634}
+
+lda.pred$posterior[1:20,1]
+lda.class[1:20]
+
+```
+
+
+raising the threshhold from 50% probabilty to 90%
+```{r, 4635}
+
+sum(lda.pred$posterior[,1]>.9)
+
+```
+
+
+
+
+
+## 4.6.4
+
+Quadratic Discriminant Analysis
+
+```{r, 464}
+
+qda.fit=qda(Direction~Lag1+Lag2,data=Smarket,subset=train)
+qda.fit
+
+
+```
+
+Test success prediciton: 59.92%
+Best model so far
+
+```{r, 4641}
+
+qda.class=predict(qda.fit,Smarket.2005)$class
+table(qda.class,Direction.2005)
+mean(qda.class==Direction.2005)
+
+```
+
+
+## 4.6.5
+
+K Nearest Neighbors (KNN)
+
+Small k then some noise is ignored and hveavily dependant on randomness. represents degrees of neighbors to use in prediction. The higher k is more accurate and flexible, but computatinally expensive, 5,10 are normally found to be best. Also can try square_rt(n)
+
+
+```{r, 465}
+
+require(class)
+train.X=cbind(Lag1,Lag2)[train,]
+test.X=cbind(Lag1,Lag2)[!train,]
+train.Direction=Direction[train]
+
+```
+
+
+Test success prediciton: 50.00%
+
+
+```{r, 4651}
+
+set.seed(1)
+knn.pred=knn(train.X,test.X,train.Direction,k=1)
+table(knn.pred,Direction.2005)
+
+(83+43)/252
+```
+
+Test success prediciton: 53.57%
+Best test
+
+
+```{r, 4652}
+
+knn.pred=knn(train.X,test.X,train.Direction,k=3)
+table(knn.pred,Direction.2005)
+mean(knn.pred==Direction.2005)
+
+
+```
+
+
+```{r, 4652x}
+
+knn.pred=knn(train.X,test.X,train.Direction,k=5)
+table(knn.pred,Direction.2005)
+mean(knn.pred==Direction.2005)
+
+```
+
+
+```{r, 4652xx}
+
+knn.pred=knn(train.X,test.X,train.Direction,k=10)
+table(knn.pred,Direction.2005)
+mean(knn.pred==Direction.2005)
+
+```
+
+
+
+```{r, 4652xxx}
+
+knn.pred=knn(train.X,test.X,train.Direction,k=15)
+table(knn.pred,Direction.2005)
+mean(knn.pred==Direction.2005)
+
+```
+
+square route of 1250 = 35
+
+```{r, 4652xxxx}
+
+knn.pred=knn(train.X,test.X,train.Direction,k=35)
+table(knn.pred,Direction.2005)
+mean(knn.pred==Direction.2005)
+
+
+```
+
+
+
+
+## 4.6.6
+
+Caravan Insurance
+
+85 predictors
+5822 observations
+response variable is Purchase as whether the person bought insurance
+
+6.0% people bought insurance
+
+```{r, 466}
+dim(Caravan)
+attach(Caravan)
+summary(Purchase)
+348/5822
+```
+
+
+
+Function scale() standardizes the data for distance ordination. If not we would have salaray difference of $1000 which is not big difference, but an age difference of 50 years which is a big difference. However salaray would be driving cause for ordination because from nominal ordination 1000 difference is larger than 50.
+
+```{r, 4661}
+
+standardized.X=scale(Caravan[,-86])
+var(Caravan[,1])
+var(Caravan[,2])
+var(standardized.X[,1])
+var(standardized.X[,2])
+
+```
+
+
+The error rate of KNN is 11.8%, however only 5.9% are a yes, so if we just blindly predicted no for all observations, we would be at an error rate of 5.9%.
+
+```{r, 4662}
+test=1:1000
+train.X=standardized.X[-test,]
+test.X=standardized.X[test,]
+train.Y=Purchase[-test]
+test.Y=Purchase[test]
+set.seed(1)
+knn.pred=knn(train.X,test.X,train.Y,k=1)
+mean(test.Y!=knn.pred)
+
+mean(test.Y!="No")
+
+```
+
+If we were to random guess the rate of success would be 6%. Looking at the confusion matrix, Among the 77 customers that bought insurance, 9 (11.7%) do purchase. True positive rate = 11.7%.
+
+```{r, 4663}
+
+table(knn.pred,test.Y)
+9/(68+9)
+```
+
+
+KNN = 3
+True positive rate = 19.2%
+
+KNN = 4
+True positive rate = 26.7%
+```{r, 4664}
+
+knn.pred=knn(train.X,test.X,train.Y,k=3)
+table(knn.pred,test.Y)
+
+5/26
+
+knn.pred=knn(train.X,test.X,train.Y,k=5)
+table(knn.pred,test.Y)
+
+4/15
+
+```
+
+
+
+Using a cutoff of 50% probability 0% predicted/true positive
+Using a cutoff of 25% probability 33% predicted/true positive
+
+
+CONCLUSION: Regular logistic model with 25% Cutoff is the best prediction model
+
+
+```{r, 4665}
+
+glm.fits=glm(Purchase~.,data=Caravan,family=binomial, subset=-test)
+
+glm.probs=predict(glm.fits,Caravan[test,],type="response")
+glm.pred=rep("No",1000)
+glm.pred[glm.probs>.5]="Yes"
+table(glm.pred,test.Y)
+
+glm.pred=rep("No",1000)
+glm.pred[glm.probs>.25]="Yes"
+table(glm.pred,test.Y)
+
+11/(22+11)
+
+
+```
+
+
+
+
+
